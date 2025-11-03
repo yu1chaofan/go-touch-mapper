@@ -51,10 +51,11 @@ CGO_ENABLE=0 GOOS=linux go build -ldflags="-s -w"
 usage: go-touch-mapper [-h|--help] [-c|--config "<value>"] [--create-js-info]
                        [--pattern "<value>"] [-t|--touch-disabled]
                        [-i|--inputManager <integer>] [--tty-path "<value>"]
-                       [--tty-screen "<value>"] [-r|--remoteControl]
+                       [--otg] [--rotation <integer>] [-r|--remoteControl]
                        [-s|--sender "<value>"] [-p|--port <integer>]
-                       [-v|--v-mouse] [--auto-release <integer>]
-                       [--measure-mode] [-d|--debug_mode]
+                       [-v|--v-mouse] [--v-mouse-addr "<value>"]
+                       [--auto-release <integer>] [--measure-mode]
+                       [-d|--debug_mode]
 
                         
 
@@ -66,15 +67,17 @@ Arguments:
       --create-js-info  创建手柄配置文件模式. Default: false
       --pattern         用于筛选设备名称的正则. Default: .*
   -t  --touch-disabled  关闭触屏混合. Default: false
-  -i  --inputManager    DisplayID
-                        使用inputManager控制触摸，可用于控制外接显示器
-                        . Default: -1
+  -i  --inputManager    DisplayID 使用inputManager控制触摸
+                        ，可用于控制外接显示器 . Default: -1
       --tty-path        串口设备路径
                         将使用串口控制外接的HID设备模拟触屏.
                         Default: 
-      --tty-screen     
-                        使用串口控制HID设备模拟触屏的屏幕参数，宽x高x旋转方向，例如1440x3440x1.
-                        Default: 1440x3440x1
+      --otg             使用OTG模式将本机模拟为HID触屏. Default:
+                        false
+      --rotation       
+                        在HID与OTG模式下手动指定设备的旋转方向，默认为
+                        1 (横屏) ，可用选值有 0(竖屏) 1(横屏)
+                        2(反向竖屏) 3(反向横屏). Default: 1
   -r  --remoteControl   是否从UDP接收远程事件. Default: false
   -s  --sender          发送本地事件到远程，输入 IP:PORT 例如
                         192.168.3.7:61069
@@ -85,13 +88,17 @@ Arguments:
   -v  --v-mouse        
                         用触摸操作模拟鼠标,需要额光标外显示程序.
                         Default: false
+      --v-mouse-addr   
+                        模拟光标显示程序地址，默认本机6533端口，输入
+                        IP:PORT 例如 192.168.3.7:61069
+                        或者仅输入IP使用默认端口6533. Default: 
       --auto-release   
                         触发视角自动释放所需的静止ms数,50ms为检查单位,置0禁用.
                         Default: 200
       --measure-mode   
                         显示视角移动像素计数,且可输入数值模拟滑动,方向键可微调.
                         Default: false
-  -d  --debug_mode      打印debug信息. Default: false
+  -d  --debug_mode      打印debug信息. Default: fals
 ```
 ## 运行示例
 
@@ -117,10 +124,6 @@ Arguments:
 
 灵敏度设置 MOUSE:SPEED:[ x , y ] float64类型，此数值也会影响右摇杆控制视角的速度
 
-实际计算输出为 int( Speed * 256 * real_move ) ，所以建议最小值大于0.00390625，否则可能会出现精度丢失的情况
-
-虚拟触屏的大小为原始屏幕尺寸的256倍，用于解决缩放时慢速移动累计精度丢失的问题
-
 ## 触屏混合
 
 程序会创建额外的uinput虚拟触屏来进行输入，默认会识别并读取机器物理触屏输入，与键鼠混合后使用虚拟触屏输出以实现映射开启时，触摸屏幕不中断操作。
@@ -136,6 +139,8 @@ Arguments:
 运行时添加使用 ```-v``` 参数，将使用触摸操作替代鼠标，仅左键可用作点击。
 
 适用于某些屏蔽了鼠标点击的游戏
+
+使用串口与树莓派otg模式时候，可设置--v-mouse-addr以操控手机端显示光标
 
 ## 手柄支持
 joystickInfos文件夹下json文件为手柄配置文件
@@ -203,6 +208,16 @@ python remote_control.py
 * 实测回报率在1000hz以下无明显延迟，超过1000hz会出现操作丢失。
 
 * 部分设备会出现输入迟缓的情况，建议降低输入设备的回报率到500hz或者更低。
+
+## OTG模式
+
+* 树莓派5，安装 [pi-gadget-hid](https://github.com/RiderLty/pi-gadget-hid)
+
+* 通过type-c供电数据分离线，为树莓派供电同时，数据线连接主机
+
+* 使用 --otg 参数 并且手动指定旋转方向 --rotation
+
+* 将键鼠插在树莓派上即可控制
 
 ## [InputManager](https://github.com/RiderLty/inputManager-touch-interface)
 ### 说明
