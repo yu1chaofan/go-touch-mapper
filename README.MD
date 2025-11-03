@@ -203,7 +203,7 @@ python remote_control.py
 
 * 执行 ```ls /dev | grep ttyACM``` 查看串口设备
 
-* 使用--tty-path指定串口设备，--tty-screen 执行屏幕尺寸与旋转方向，例如：```./go-touch-mapper--tty-path /dev/ttyACM0 --tty-screen 1920x1080x1``` 
+* 使用--tty-path指定串口设备，--rotation 指定旋转方向，例如：```./go-touch-mapper--tty-path /dev/ttyACM0 ``` 
 
 * 实测回报率在1000hz以下无明显延迟，超过1000hz会出现操作丢失。
 
