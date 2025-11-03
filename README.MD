@@ -192,7 +192,7 @@ python remote_control.py
 
 ### 使用方式
 
-* 刷入hid_touch.ino固件   [在线烧录](https://riderlty.github.io/go-touch-mapper/)
+* 刷入hid_touch.ino固件   [点击在线烧录](https://riderlty.github.io/go-touch-mapper/)
 
 * 将键鼠手柄与ESP32-s3的串口连接到例如树莓派之类的linux设备上，USB口连接到被控设备
 
@@ -200,7 +200,9 @@ python remote_control.py
 
 * 使用--tty-path指定串口设备，--tty-screen 执行屏幕尺寸与旋转方向，例如：```./go-touch-mapper--tty-path /dev/ttyACM0 --tty-screen 1920x1080x1``` 
 
-* 建议设备回报率不要超过500HZ
+* 实测回报率在1000hz以下无明显延迟，超过1000hz会出现操作丢失。
+
+* 部分设备会出现输入迟缓的情况，建议降低输入设备的回报率到500hz或者更低。
 
 ## [InputManager](https://github.com/RiderLty/inputManager-touch-interface)
 ### 说明

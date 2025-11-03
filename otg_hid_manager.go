@@ -2,13 +2,31 @@ package main
 
 import (
 	"encoding/binary"
-
-	"go.bug.st/serial"
+	"os"
 )
 
-func handel_touch_using_hid_manager(port serial.Port, rotation int) touch_control_func {
+func handel_touch_using_otg_manager(rotation int) touch_control_func {
+	touch_fd, err := os.OpenFile("/dev/hidg0", os.O_RDWR, 0666)
+	if err != nil {
+		logger.Errorf("无法打开OTG HID设备文件: %s", err.Error())
+		os.Exit(4)
+	}
+	// mouse_fd, err := os.OpenFile("/dev/hidg1", os.O_RDWR, 0666)
+	// if err != nil {
+	// 	logger.Errorf("无法打开OTG HID设备文件: %s", err.Error())
+	// 	os.Exit(4)
+	// }
+	// keyboard_fd, err := os.OpenFile("/dev/hidg2", os.O_RDWR, 0666)
+	// if err != nil {
+	// 	logger.Errorf("无法打开OTG HID设备文件: %s", err.Error())
+	// 	os.Exit(4)
+	// }
+	// defer touch_fd.Close()
+	// defer mouse_fd.Close()
+	// defer keyboard_fd.Close()
+
 	var buf [12]byte
-	buf[0] = 0xF4
+	buf[0] = 0x01
 	setReport := func(action uint8, id uint8, x, y uint32) {
 		buf[1] = action
 		buf[2] = id
@@ -37,13 +55,10 @@ func handel_touch_using_hid_manager(port serial.Port, rotation int) touch_contro
 		case TouchActionRequire, TouchActionMove:
 			x, y := rot_xy(control_data)
 			setReport(0x01, uint8(control_data.id), uint32(x), uint32(y))
-			port.Write(buf[:])
+			touch_fd.Write(buf[:])
 		case TouchActionRelease:
 			setReport(0x00, uint8(control_data.id), 0, 0)
-			port.Write(buf[:])
-		case TouchActionResetResolution:
-			setReport(0x03, uint8(control_data.id), uint32(control_data.x), uint32(control_data.y))
-			port.Write(buf[:])
+			touch_fd.Write(buf[:])
 		}
 	}
 }

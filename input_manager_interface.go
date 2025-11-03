@@ -66,14 +66,19 @@ func handel_touch_using_input_manager(displayID int) touch_control_func {
 		unixConn.Close()
 		unixListener.Close()
 	}()
-
+	x := make([]byte, 4)
+	y := make([]byte, 4)
 	return func(control_data touch_control_pack) {
 		action := byte(control_data.action)
 		id := byte(control_data.id & 0xff)
-		x := make([]byte, 4)
-		y := make([]byte, 4)
-		binary.LittleEndian.PutUint32(x, uint32(control_data.x>>touch_pos_scale)) //缩放 但是不会累计误差
-		binary.LittleEndian.PutUint32(y, uint32(control_data.y>>touch_pos_scale))
+		switch global_device_orientation {
+		case 0, 2:
+			binary.LittleEndian.PutUint32(x, uint32(int64(control_data.x)*int64(control_data.screen_y)/0x7ffffffe))
+			binary.LittleEndian.PutUint32(y, uint32(int64(control_data.y)*int64(control_data.screen_x)/0x7ffffffe))
+		case 1, 3:
+			binary.LittleEndian.PutUint32(x, uint32(int64(control_data.x)*int64(control_data.screen_x)/0x7ffffffe))
+			binary.LittleEndian.PutUint32(y, uint32(int64(control_data.y)*int64(control_data.screen_y)/0x7ffffffe))
+		}
 		writer.Write([]byte{action, id, x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3]})
 		writer.Flush()
 	}

@@ -292,8 +292,9 @@ func InitTouchHandler(
 	abs_last_map.Store("RS_Y", 0.5)
 
 	screenSizeX := config_json.Get("SCREEN").Get("SIZE").GetIndex(0).MustInt()
+	global_screen_x = int32(screenSizeX)
 	screenSizeY := config_json.Get("SCREEN").Get("SIZE").GetIndex(1).MustInt()
-
+	global_screen_y = int32(screenSizeY)
 	KEYBOARD_SWITCH_KEY_NAME_S := make(map[string]bool)
 	for _, key := range config_json.Get("MOUSE").Get("SWITCH_KEYS").MustStringArray() {
 		if key != "" {
@@ -314,16 +315,16 @@ func InitTouchHandler(
 		// ^^^ 是可以创建超过12个的 只是不显示白点罢了
 		config:         config_json,
 		joystickInfo:   joystickInfo,
-		screen_x:       int32(screenSizeX << touch_pos_scale),
-		screen_y:       int32(screenSizeY << touch_pos_scale),
+		screen_x:       int32(screenSizeX),
+		screen_y:       int32(screenSizeY),
 		rel_screen_x:   int32(screenSizeX),
 		rel_screen_y:   int32(screenSizeY),
-		view_init_x:    int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX<<touch_pos_scale)),
-		view_init_y:    int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY<<touch_pos_scale)),
-		view_current_x: int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX<<touch_pos_scale)),
-		view_current_y: int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY<<touch_pos_scale)),
-		view_speed_x:   int32((1 << touch_pos_scale) * config_json.Get("MOUSE").Get("SPEED").GetIndex(0).MustFloat64()),
-		view_speed_y:   int32((1 << touch_pos_scale) * config_json.Get("MOUSE").Get("SPEED").GetIndex(1).MustFloat64()),
+		view_init_x:    int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX)),
+		view_init_y:    int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY)),
+		view_current_x: int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX)),
+		view_current_y: int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY)),
+		view_speed_x:   int32(config_json.Get("MOUSE").Get("SPEED").GetIndex(0).MustFloat64() * 0x7ffffffe / float64(screenSizeX)),
+		view_speed_y:   int32(config_json.Get("MOUSE").Get("SPEED").GetIndex(1).MustFloat64() * 0x7ffffffe / float64(screenSizeX)),
 		// rs_speed_x:     config_json.Get("MOUSE").Get("RS_SPEED").GetIndex(0).MustFloat64(),
 		// rs_speed_y:     config_json.Get("MOUSE").Get("RS_SPEED").GetIndex(1).MustFloat64(),
 		rs_speed_x:   32,
@@ -376,16 +377,16 @@ func (self *TouchHandler) reloadConfigure(mapperFilePath string) {
 	screenSizeX := config_json.Get("SCREEN").Get("SIZE").GetIndex(0).MustInt()
 	screenSizeY := config_json.Get("SCREEN").Get("SIZE").GetIndex(1).MustInt()
 	self.config = config_json
-	self.screen_x = int32(screenSizeX << touch_pos_scale)
-	self.screen_y = int32(screenSizeY << touch_pos_scale)
+	self.screen_x = int32(screenSizeX)
+	self.screen_y = int32(screenSizeY)
 	self.rel_screen_x = int32(screenSizeX)
 	self.rel_screen_y = int32(screenSizeY)
-	self.view_init_x = int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX<<touch_pos_scale))
-	self.view_init_y = int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY<<touch_pos_scale))
-	self.view_current_x = int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX<<touch_pos_scale))
-	self.view_current_y = int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY<<touch_pos_scale))
-	self.view_speed_x = int32((1 << touch_pos_scale) * config_json.Get("MOUSE").Get("SPEED").GetIndex(0).MustFloat64())
-	self.view_speed_y = int32((1 << touch_pos_scale) * config_json.Get("MOUSE").Get("SPEED").GetIndex(1).MustFloat64())
+	self.view_init_x = int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX))
+	self.view_init_y = int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY))
+	self.view_current_x = int32(config_json.Get("MOUSE").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX))
+	self.view_current_y = int32(config_json.Get("MOUSE").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY))
+	self.view_speed_x = int32(config_json.Get("MOUSE").Get("SPEED").GetIndex(0).MustFloat64() * 0x7ffffffe / float64(screenSizeX))
+	self.view_speed_y = int32(config_json.Get("MOUSE").Get("SPEED").GetIndex(1).MustFloat64() * 0x7ffffffe / float64(screenSizeX))
 	self.wheel_init_x = int32(config_json.Get("WHEEL").Get("POS").GetIndex(0).MustFloat64() * float64(screenSizeX))
 	self.wheel_init_y = int32(config_json.Get("WHEEL").Get("POS").GetIndex(1).MustFloat64() * float64(screenSizeY))
 	self.wheel_range = int32(config_json.Get("WHEEL").Get("RANGE").MustFloat64() * float64(screenSizeX))
@@ -412,12 +413,21 @@ func (self *TouchHandler) reloadConfigure(mapperFilePath string) {
 	self.wheel_shift_range = int32(config_json.Get("WHEEL").Get("SHIFT_RANGE").MustFloat64() * float64(screenSizeX))
 }
 
+func (self *TouchHandler) get_scaled_pos(x int32, y int32) (int32, int32) {
+	return int32(int64(x) * 0x7ffffffe / int64(self.rel_screen_x)), int32(int64(y) * 0x7ffffffe / int64(self.rel_screen_y))
+}
+
 func (self *TouchHandler) touch_require(x int32, y int32, scale uint8) int32 {
 
 	for i, v := range self.allocated_id {
 		if !v {
 			self.allocated_id[i] = true
-			self.send_touch_control_pack(TouchActionRequire, int32(i), x<<scale, y<<scale)
+			if scale == 0 {
+				self.send_touch_control_pack(TouchActionRequire, int32(i), x, y)
+			} else {
+				scaled_x, scaled_y := self.get_scaled_pos(x, y)
+				self.send_touch_control_pack(TouchActionRequire, int32(i), scaled_x, scaled_y)
+			}
 			logger.Debugf("touch require (%v,%v) <= [%v]", x, y, i)
 			return int32(i)
 		}
@@ -437,7 +447,13 @@ func (self *TouchHandler) touch_release(id int32) int32 {
 func (self *TouchHandler) touch_move(id int32, x int32, y int32, scale uint8) {
 	logger.Debugf("touch move to (%v,%v) [%v]", x, y, id)
 	if id != -1 {
-		self.send_touch_control_pack(TouchActionMove, id, x<<scale, y<<scale)
+		if scale == 0 {
+			self.send_touch_control_pack(TouchActionMove, id, x, y)
+		} else {
+			scaled_x, scaled_y := self.get_scaled_pos(x, y)
+			self.send_touch_control_pack(TouchActionMove, id, scaled_x, scaled_y)
+		}
+
 	}
 }
 
@@ -491,35 +507,47 @@ func (self *TouchHandler) handel_view_move(offset_x int32, offset_y int32) { //�
 	}
 	self.auto_release_view_count = 0
 	if self.view_id == -1 {
-		self.view_current_x = self.view_init_x + rand_offset()<<touch_pos_scale
-		self.view_current_y = self.view_init_y + rand_offset()<<touch_pos_scale
+		self.view_current_x, self.view_current_y = self.get_scaled_pos(self.view_init_x+rand_offset(), self.view_init_y+rand_offset())
 		self.view_id = self.touch_require(self.view_current_x, self.view_current_y, 0)
 	}
 	self.view_current_x += offset_x * self.view_speed_x
 	self.view_current_y += offset_y * self.view_speed_y
-	if self.view_range_limited { //有界 or 无界 即 使用eventX 还是 inputManager
-		if self.view_current_x <= 0 || self.view_current_x >= self.screen_x || self.view_current_y <= 0 || self.view_current_y >= self.screen_y {
-			//测试了两个软件
-			//都可以同时两个触摸点控制视角
-			//所以这里超出范围时候逻辑修改了
-			//原本的点的目标超出了 但是暂时不释放
-			//此时去申请一个新的触控点来执行本次滑动操作
-			//然后再将原本的触控点释放 并将新的触控点设置为当前控制用的触控点
-			//即从原本的瞬间松开再按下 改为了按下新的再松开
-			self.view_current_x = self.view_init_x + rand_offset()
-			self.view_current_y = self.view_init_y + rand_offset()
-			tmp_view_id := self.touch_require(self.view_current_x, self.view_current_y, 0)
-			self.view_current_x += offset_x * self.view_speed_x //用的时直接写event坐标系
-			self.view_current_y += offset_y * self.view_speed_y
-			self.touch_move(tmp_view_id, self.view_current_x, self.view_current_y, 0)
-			self.touch_release(self.view_id)
-			self.view_id = tmp_view_id
-		} else {
-			self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
-		}
+	// if self.view_range_limited { //有界 or 无界 即 使用eventX 还是 inputManager
+	// 	if self.view_current_x <= 0 || self.view_current_x >= 0xfffffe || self.view_current_y <= 0 || self.view_current_y >= 0xfffffe {
+	// 		//测试了两个软件
+	// 		//都可以同时两个触摸点控制视角
+	// 		//所以这里超出范围时候逻辑修改了
+	// 		//原本的点的目标超出了 但是暂时不释放
+	// 		//此时去申请一个新的触控点来执行本次滑动操作
+	// 		//然后再将原本的触控点释放 并将新的触控点设置为当前控制用的触控点
+	// 		//即从原本的瞬间松开再按下 改为了按下新的再松开
+	// 		self.view_current_x = self.view_init_x + rand_offset()
+	// 		self.view_current_y = self.view_init_y + rand_offset()
+	// 		tmp_view_id := self.touch_require(self.view_current_x, self.view_current_y, 0)
+	// 		self.view_current_x += offset_x * self.view_speed_x //用的时直接写event坐标系
+	// 		self.view_current_y += offset_y * self.view_speed_y
+	// 		self.touch_move(tmp_view_id, self.view_current_x, self.view_current_y, 0)
+	// 		self.touch_release(self.view_id)
+	// 		self.view_id = tmp_view_id
+	// 	} else {
+	// 		self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
+	// 	}
+	// } else {
+	// 	self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
+	// }
+	// 采用了0x7ffffffe作为边界的情况下，所情况有都为有界
+	if self.view_current_x < 0 || self.view_current_y < 0 { //出现负数 表示到达边界
+		self.view_current_x, self.view_current_y = self.get_scaled_pos(self.view_init_x+rand_offset(), self.view_init_y+rand_offset())
+		tmp_view_id := self.touch_require(self.view_current_x, self.view_current_y, 0)
+		self.view_current_x += offset_x * self.view_speed_x
+		self.view_current_y += offset_y * self.view_speed_y
+		self.touch_move(tmp_view_id, self.view_current_x, self.view_current_y, 0)
+		self.touch_release(self.view_id)
+		self.view_id = tmp_view_id
 	} else {
 		self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
 	}
+
 }
 
 func (self *TouchHandler) auto_handel_view_release(timeout int) { //视角释放
@@ -1014,15 +1042,15 @@ func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max
 	translate_xy := func(x, y int32) (int32, int32) { //根据设备方向 将eventX的坐标系转换为标准坐标系
 		switch global_device_orientation { //
 		case 0: //normal
-			return x, y
+			return int32(int64(x) * 0x7ffffffe / int64(wm_size_x)), int32(int64(y) * 0x7ffffffe / int64(wm_size_y))
 		case 1: //left side down
 			// return y, self.screen_y - x
-			return y, wm_size_x - x
+			return int32(int64(y) * 0x7ffffffe / int64(wm_size_y)), int32(int64(wm_size_x-x) * 0x7ffffffe / int64(wm_size_x))
 		case 2: //up side down
 			// return self.screen_y - x, self.screen_x - y
-			return wm_size_x - x, wm_size_y - y
+			return int32(int64(wm_size_x-x) * 0x7ffffffe / int64(wm_size_x)), int32(int64(wm_size_y-y) * 0x7ffffffe / int64(wm_size_y))
 		case 3: //right side down
-			return wm_size_y - y, x
+			return int32(int64(wm_size_y-y) * 0x7ffffffe / int64(wm_size_y)), int32(int64(x) * 0x7ffffffe / int64(wm_size_x))
 		default:
 			return x, y
 		}
@@ -1057,7 +1085,7 @@ func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max
 				if copy_id_statuses[i] != id_statuses[i] {
 					if id_statuses[i] { //false -> true 申请
 						x, y := translate_xy(pos_s[i][0], pos_s[i][1])
-						id_2_vid[i] = self.touch_require(x, y, touch_pos_scale)
+						id_2_vid[i] = self.touch_require(x, y, 0)
 						logger.Debugf("mixTouch\trequire\t[%d] translate_xy(%d,%d) => (%d,%d)", i, pos_s[i][0], pos_s[i][1], x, y)
 					} else {
 						self.touch_release(id_2_vid[i])
@@ -1066,7 +1094,7 @@ func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max
 				} else {
 					if pos_s[i][0] != copy_pos_s[i][0] || pos_s[i][1] != copy_pos_s[i][1] {
 						x, y := translate_xy(pos_s[i][0], pos_s[i][1])
-						self.touch_move(id_2_vid[i], x, y, touch_pos_scale)
+						self.touch_move(id_2_vid[i], x, y, 0)
 						logger.Debugf("mixTouch\tmove\t[%d] translate_xy(%d,%d) => (%d,%d)", i, pos_s[i][0], pos_s[i][1], x, y)
 					}
 				}

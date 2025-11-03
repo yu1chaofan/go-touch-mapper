@@ -141,6 +141,9 @@ func udp_event_injector(ch chan *event_pack, port int) {
 
 var global_close_signal = make(chan bool) //仅会在程序退出时关闭  不用于其他用途
 var global_device_orientation int32 = 0
+var global_is_wordking_remote bool = false // 是否正在远程控制 并且无法获取触屏状态
+var global_screen_x int32 = 1000
+var global_screen_y int32 = 1000
 
 func get_device_orientation() int32 {
 	output, err := exec.Command("sh", "-c", "dumpsys input").Output()
@@ -513,7 +516,7 @@ func main() {
 	var usingInputManagerID *int = parser.Int("i", "inputManager", &argparse.Options{
 		Required: false,
 		Default:  -1,
-		Help:     "DisplayID 使用inputManager控制触摸，可用于控制外接显示器 ",
+		Help:     "DisplayID 使用inputManager控制触摸 ，可用于控制外接显示器 ",
 	})
 
 	var usingHIDTouchTtyPath *string = parser.String("", "tty-path", &argparse.Options{
@@ -522,10 +525,16 @@ func main() {
 		Help:     "串口设备路径 将使用串口控制外接的HID设备模拟触屏",
 	})
 
-	var usingHIDTouchScreen *string = parser.String("", "tty-screen", &argparse.Options{
+	var usingOTGMode *bool = parser.Flag("", "otg", &argparse.Options{
 		Required: false,
-		Default:  "1440x3440x1",
-		Help:     "使用串口控制HID设备模拟触屏的屏幕参数，宽x高x旋转方向，例如1440x3440x1",
+		Default:  false,
+		Help:     "使用OTG模式将本机模拟为HID触屏",
+	})
+
+	var usingDeviceRotation *int = parser.Int("", "rotation", &argparse.Options{
+		Required: false,
+		Default:  1,
+		Help:     "在HID与OTG模式下手动指定设备的旋转方向，默认为 1 (横屏) ，可用选值有 0(竖屏) 1(横屏) 2(反向竖屏) 3(反向横屏)",
 	})
 
 	var using_remote_control *bool = parser.Flag("r", "remoteControl", &argparse.Options{
@@ -550,6 +559,12 @@ func main() {
 		Required: false,
 		Default:  false,
 		Help:     "用触摸操作模拟鼠标,需要额光标外显示程序",
+	})
+
+	var using_remote_v_mouse *string = parser.String("", "v-mouse-addr", &argparse.Options{
+		Required: false,
+		Default:  "",
+		Help:     "模拟光标显示程序地址，默认本机6533端口，输入 IP:PORT 例如 192.168.3.7:61069 或者仅输入IP使用默认端口6533",
 	})
 
 	var view_release_timeout *int = parser.Int("", "auto-release", &argparse.Options{
@@ -647,12 +662,6 @@ func main() {
 			os.Exit(2)
 		}
 
-		hid_x, hid_y, hid_r, err := parseHIDTouchScreen(*usingHIDTouchScreen)
-		if err != nil {
-			logger.Error("解析失败: %v\n", err)
-			return
-		}
-
 		if *debug_mode {
 			logger.WithDebug()
 			logger.Debug("debug on")
@@ -732,45 +741,55 @@ func main() {
 						logger.Infof("启用触屏混合 %s(/dev/input/event%d) : %s", devName, index, devTypeFriendlyName[devType])
 						go dev_reader(touch_event_ch, index)
 						max_mt_x, max_mt_y = get_MT_size(map[int]bool{index: true})
-						break
+						// break
 					}
 				}
 			}
 
 			go auto_detect_and_read(events_ch, *patern)
 
-			go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
-
 			var touch_control_func touch_control_func
 
 			if *usingHIDTouchTtyPath != "" {
-				logger.Info("触屏控制将使用串口控制外接的HID设备处理")
+				global_is_wordking_remote = true
+				if *usingDeviceRotation < 0 || *usingDeviceRotation > 3 {
+					logger.Error("旋转参数错误 可用选值有 0(竖屏) 1(横屏) 2(反向竖屏) 3(反向横屏)")
+					return
+				}
+				logger.Info("触屏控制将使用串口控制外接的HID设备发送至主机")
 				logger.Infof("串口路径：%s", *usingHIDTouchTtyPath)
-				logger.Infof("HID触屏尺寸：%dx%d", hid_x, hid_y)
-				logger.Infof("HID触屏方向：%d", hid_r)
-
+				logger.Infof("触屏方向：%d", *usingDeviceRotation)
 				port, err := OpenSerialWritePipe(*usingHIDTouchTtyPath, 2000000)
 				if err != nil {
 					logger.Errorf("无法打开串口: %v", err)
 					return
 				}
-				touch_control_func = handel_touch_using_hid_manager(port, hid_x, hid_y, hid_r)
-				touch_control_func(touch_control_pack{
-					action:   TouchActionResetResolution,
-					id:       0,
-					x:        int32(hid_x),
-					y:        int32(hid_y),
-					screen_x: int32(hid_x),
-					screen_y: int32(hid_y),
-				})
+				go (func() {
+					for {
+						select {
+						case <-global_close_signal:
+							return
+						case <-fileted_u_input_control_ch:
+						}
+					}
+				})()
+				touch_control_func = handel_touch_using_hid_manager(port, *usingDeviceRotation)
+			} else if *usingOTGMode { //本机模拟成otg的触屏
+				global_is_wordking_remote = true
+				logger.Info("触屏控制将使用本机模拟为HID设备发送至主机")
+				logger.Infof("触屏方向：%d", *usingDeviceRotation)
+				touch_control_func = handel_touch_using_otg_manager(*usingDeviceRotation)
 
 			} else if *usingInputManagerID != -1 {
-				logger.Info("触屏控制将使用inputManager处理")
+				logger.Info("触屏控制将使用inputManager在本机处理")
+				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
 				go listen_device_orientation()
 				touch_control_func = handel_touch_using_input_manager(*usingInputManagerID)
 			} else {
-				touch_control_func = handel_touch_using_uinput_touch()
+				logger.Info("触屏控制将使用uinput在本机处理")
+				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
 				go listen_device_orientation()
+				touch_control_func = handel_touch_using_uinput_touch()
 			}
 
 			map_switch_signal := make(chan bool) //通知虚拟鼠标当前为鼠标还是映射模式
@@ -783,16 +802,34 @@ func main() {
 				map_switch_signal,
 				*measure_sensitivity_mode,
 			)
-			if *usingHIDTouchTtyPath == "" {
+			if *usingHIDTouchTtyPath == "" { //只有本机运行的时候 才有必要开启触屏混合
 				go touchHandler.mix_touch(touch_event_ch, max_mt_x, max_mt_y)
 			}
 			go touchHandler.auto_handel_view_release(*view_release_timeout)
 			go touchHandler.loop_handel_wasd_wheel()
 			go touchHandler.loop_handel_rs_move()
 			go touchHandler.handel_event()
+
 			if *using_v_mouse {
-				v_mouse := init_v_mouse_controller(touchHandler, u_input_control_ch, fileted_u_input_control_ch, map_switch_signal)
-				go v_mouse.main_loop()
+				if *using_remote_v_mouse != "" {
+					ip, port, err := parseSenderAddress(*using_remote_v_mouse, 6533)
+					if err != nil {
+						logger.Errorf("解析模拟光标显示程序地址失败: %v", err)
+						return
+					}
+					v_mouse := init_v_mouse_controller(touchHandler, u_input_control_ch, fileted_u_input_control_ch, map_switch_signal, net.UDPAddr{
+						IP:   net.ParseIP(ip),
+						Port: port,
+					})
+					go v_mouse.main_loop()
+
+				} else {
+					v_mouse := init_v_mouse_controller(touchHandler, u_input_control_ch, fileted_u_input_control_ch, map_switch_signal, net.UDPAddr{
+						IP:   net.IPv4(0, 0, 0, 0),
+						Port: 6533,
+					})
+					go v_mouse.main_loop()
+				}
 			} else {
 				go (func() {
 					for {

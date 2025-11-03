@@ -26,13 +26,11 @@ func init_v_mouse_controller(
 	u_input_control_ch chan *u_input_control_pack,
 	fileted_u_input_control_ch chan *u_input_control_pack,
 	map_switch_signal chan bool,
+	addr net.UDPAddr,
 ) *v_mouse_controller {
 	udp_ch := make(chan []byte)
 	go (func() {
-		socket, err := net.DialUDP("udp", nil, &net.UDPAddr{
-			IP:   net.IPv4(0, 0, 0, 0),
-			Port: 6533,
-		})
+		socket, err := net.DialUDP("udp", nil, &addr)
 		if err != nil {
 			logger.Errorf("连接v_mouse失败 : %s", err.Error())
 			os.Exit(3)
@@ -48,7 +46,14 @@ func init_v_mouse_controller(
 			}
 		}
 	})()
-	screen_x, screen_y := get_wm_size()
+	screen_x, screen_y := int32(0), int32(0)
+	if global_is_wordking_remote {
+		screen_x = global_screen_x
+		screen_y = global_screen_y
+	} else {
+		screen_x, screen_y = get_wm_size()
+
+	}
 
 	return &v_mouse_controller{
 		touchHandlerInstance: touchHandlerInstance,
@@ -67,10 +72,14 @@ func init_v_mouse_controller(
 }
 
 func (self *v_mouse_controller) get_max_xy_val() (int32, int32) {
-	if global_device_orientation == 0 || global_device_orientation == 2 {
-		return self.screen_x, self.screen_y
+	if global_is_wordking_remote {
+		return global_screen_x, global_screen_y
 	} else {
-		return self.screen_y, self.screen_x
+		if global_device_orientation == 0 || global_device_orientation == 2 {
+			return self.screen_x, self.screen_y
+		} else {
+			return self.screen_y, self.screen_x
+		}
 	}
 }
 

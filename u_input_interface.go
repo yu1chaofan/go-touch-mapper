@@ -63,8 +63,12 @@ func create_u_input_touch_screen(width int32, height int32) *os.File {
 	absMin[absMtTrackingId] = 0
 
 	var absMax [absCnt]int32
-	absMax[absMtPositionX] = width << touch_pos_scale  //可以通过缩放 来获得更高精度
-	absMax[absMtPositionY] = height << touch_pos_scale //坐标系会自动以原点缩放
+	// absMax[absMtPositionX] = width << touch_pos_scale  //可以通过缩放 来获得更高精度
+	// absMax[absMtPositionY] = height << touch_pos_scale //坐标系会自动以原点缩放
+
+	absMax[absMtPositionX] = 0x7ffffffe
+	absMax[absMtPositionY] = 0x7ffffffe
+
 	absMax[absMtTouchMajor] = 255
 	absMax[absMtWidthMajor] = 0
 	absMax[absMtSlot] = 9
@@ -299,20 +303,37 @@ func handel_touch_using_uinput_touch() touch_control_func {
 	// 	// }
 
 	// }
+
+	// rot_xy := func(pack touch_control_pack) (int32, int32) { //根据方向旋转坐标
+	// 	switch global_device_orientation {
+	// 	case 0:
+	// 		return pack.x, pack.y
+	// 	case 1:
+	// 		return (pack.screen_y - pack.y*pack.screen_y/0x7ffffffe) * 0x7ffffffe / pack.screen_y, pack.x
+	// 	case 2:
+	// 		return 0x7ffffffe - pack.x, 0x7ffffffe - pack.y
+	// 	case 3:
+	// 		return pack.y, pack.screen_x - pack.x
+	// 	default:
+	// 		return pack.x, pack.y
+	// 	}
+	// }
+
 	rot_xy := func(pack touch_control_pack) (int32, int32) { //根据方向旋转坐标
 		switch global_device_orientation {
 		case 0:
 			return pack.x, pack.y
 		case 1:
-			return pack.screen_y - pack.y, pack.x
+			return 0x7ffffffe - pack.y, pack.x
 		case 2:
-			return pack.screen_x - pack.x, pack.screen_y - pack.y
+			return 0x7ffffffe - pack.x, 0x7ffffffe - pack.y
 		case 3:
-			return pack.y, pack.screen_x - pack.x
+			return pack.y, 0x7ffffffe - pack.x
 		default:
 			return pack.x, pack.y
 		}
 	}
+
 	// ev_sync := evdev.Event{Type: EV_SYN, Code: 0, Value: 0}
 	var count int32 = 0    //BTN_TOUCH 申请时为1 则按下 释放时为0 则松开
 	var last_id int32 = -1 //ABS_MT_SLOT last_id每次动作后修改 如果不等则额外发送MT_SLOT事件
