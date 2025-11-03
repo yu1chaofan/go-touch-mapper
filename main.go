@@ -779,7 +779,15 @@ func main() {
 				logger.Info("触屏控制将使用本机模拟为HID设备发送至主机")
 				logger.Infof("触屏方向：%d", *usingDeviceRotation)
 				touch_control_func = handel_touch_using_otg_manager(*usingDeviceRotation)
-
+				go (func() {
+					for {
+						select {
+						case <-global_close_signal:
+							return
+						case <-fileted_u_input_control_ch:
+						}
+					}
+				})()
 			} else if *usingInputManagerID != -1 {
 				logger.Info("触屏控制将使用inputManager在本机处理")
 				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
@@ -802,7 +810,7 @@ func main() {
 				map_switch_signal,
 				*measure_sensitivity_mode,
 			)
-			if *usingHIDTouchTtyPath == "" { //只有本机运行的时候 才有必要开启触屏混合
+			if global_is_wordking_remote == false { //只有本机运行的时候 才有必要开启触屏混合
 				go touchHandler.mix_touch(touch_event_ch, max_mt_x, max_mt_y)
 			}
 			go touchHandler.auto_handel_view_release(*view_release_timeout)

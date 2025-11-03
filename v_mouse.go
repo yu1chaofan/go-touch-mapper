@@ -52,7 +52,6 @@ func init_v_mouse_controller(
 		screen_y = global_screen_y
 	} else {
 		screen_x, screen_y = get_wm_size()
-
 	}
 
 	return &v_mouse_controller{
