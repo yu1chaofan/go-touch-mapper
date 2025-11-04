@@ -23,6 +23,8 @@ import (
 	"go.bug.st/serial"
 )
 
+var go_build_version string = ""
+
 type event_pack struct {
 	//表示一个动作 由一系列event组成
 	dev_name string
@@ -488,6 +490,10 @@ func fileExists(filename string) bool {
 var configs embed.FS
 
 func main() {
+	if go_build_version == "" {
+		go_build_version = "DEVELOPMENT BUILD"
+	}
+	logger.Infof("当前构建版本: %v", go_build_version)
 	parser := argparse.NewParser("go-touch-mapper", " ")
 
 	var configPath *string = parser.String("c", "config", &argparse.Options{

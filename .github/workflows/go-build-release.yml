@@ -36,10 +36,10 @@ jobs:
       run: go build
       
     - name: Build amd64
-      run: CGO_ENABLE=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o go-touch-mapper_amd64
+      run: CGO_ENABLE=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.go_build_version=${{ github.event.client_payload.tag}}" -o go-touch-mapper_amd64
     
     - name: Build arm64
-      run: CGO_ENABLE=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o go-touch-mapper_arm64
+      run: CGO_ENABLE=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.go_build_version=${{ github.event.client_payload.tag}}" -o go-touch-mapper_arm64
     
     - name: list files
       run: ls -al
@@ -58,3 +58,7 @@ jobs:
           go-touch-mapper_amd64
           go-touch-mapper_arm64
 
+    - name: upload to mirror
+      run: |
+        curl -T "go-touch-mapper_amd64" -u "${{ secrets.WEBDAV_USERNAME }}:${{ secrets.WEBDAV_PASSWORD }}"  "${{ secrets.WEBDAV_ENDPOINT }}/direct/projects/go-touch-mapper/build/go-touch-mapper_amd64"
+        curl -T "go-touch-mapper_arm64" -u "${{ secrets.WEBDAV_USERNAME }}:${{ secrets.WEBDAV_PASSWORD }}"  "${{ secrets.WEBDAV_ENDPOINT }}/direct/projects/go-touch-mapper/build/go-touch-mapper_arm64"
