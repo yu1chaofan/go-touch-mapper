@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func handel_touch_using_otg_manager(rotation int) touch_control_func {
+func handel_touch_using_otg_manager() touch_control_func {
 	touch_fd, err := os.OpenFile("/dev/hidg0", os.O_RDWR, 0666)
 	if err != nil {
 		logger.Errorf("无法打开OTG HID设备文件: %s", err.Error())
@@ -35,25 +35,10 @@ func handel_touch_using_otg_manager(rotation int) touch_control_func {
 		buf[11] = 0
 	}
 
-	rot_xy := func(pack touch_control_pack) (int32, int32) { //根据方向旋转坐标
-		switch rotation {
-		case 0:
-			return pack.x, pack.y
-		case 1:
-			return 0x7ffffffe - pack.y, pack.x
-		case 2:
-			return 0x7ffffffe - pack.x, 0x7ffffffe - pack.y
-		case 3:
-			return pack.y, 0x7ffffffe - pack.x
-		default:
-			return pack.x, pack.y
-		}
-	}
-
 	return func(control_data touch_control_pack) {
 		switch control_data.action {
 		case TouchActionRequire, TouchActionMove:
-			x, y := rot_xy(control_data)
+			x, y := rotateAbsoluteXY(control_data.x, control_data.y)
 			setReport(0x01, uint8(control_data.id), uint32(x), uint32(y))
 			touch_fd.Write(buf[:])
 		case TouchActionRelease:

@@ -152,7 +152,7 @@ func (self *v_mouse_controller) on_mouse_move(rel_x, rel_y int32) {
 		}
 		self.display_mouse_control(true, self.left_downing, self.mouse_x, self.mouse_y)
 		if self.left_downing && self.mouse_id != -1 {
-			self.touchHandlerInstance.touch_move(self.mouse_id, self.mouse_x, self.mouse_y, touch_pos_scale)
+			self.touchHandlerInstance.touch_move(self.mouse_id, int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y)*0x7ffffffe/int64(max_y)), false)
 		}
 	} else {
 		logger.Error("ERROR: mouse_move: not working")
@@ -163,7 +163,8 @@ func (self *v_mouse_controller) on_left_btn(up_down int32) {
 	if self.working {
 		if up_down == DOWN {
 			self.left_downing = true
-			self.mouse_id = self.touchHandlerInstance.touch_require(self.mouse_x, self.mouse_y, touch_pos_scale)
+			max_x, max_y := self.get_max_xy_val()
+			self.mouse_id = self.touchHandlerInstance.touch_require(int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y)*0x7ffffffe/int64(max_y)), false)
 
 		} else {
 			self.left_downing = false
@@ -176,12 +177,12 @@ func (self *v_mouse_controller) on_left_btn(up_down int32) {
 	}
 }
 
-func (self *v_mouse_controller) on_hwheel_action(value int32) { //有待优化
-	if self.working {
-		hwheel_id := self.touchHandlerInstance.touch_require(self.mouse_x, self.mouse_y, touch_pos_scale)
-		self.touchHandlerInstance.touch_move(hwheel_id, self.mouse_x, self.mouse_y+value, touch_pos_scale)
-		self.touchHandlerInstance.touch_release(hwheel_id)
-	} else {
-		logger.Error("ERROR: hwheel_action: not working")
-	}
-}
+// func (self *v_mouse_controller) on_hwheel_action(value int32) { //有待优化
+// 	if self.working {
+// 		hwheel_id := self.touchHandlerInstance.touch_require(self.mouse_x, self.mouse_y, touch_pos_scale)
+// 		self.touchHandlerInstance.touch_move(hwheel_id, self.mouse_x, self.mouse_y+value, touch_pos_scale)
+// 		self.touchHandlerInstance.touch_release(hwheel_id)
+// 	} else {
+// 		logger.Error("ERROR: hwheel_action: not working")
+// 	}
+// }

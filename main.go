@@ -141,9 +141,9 @@ func udp_event_injector(ch chan *event_pack, port int) {
 	}
 }
 
-var global_close_signal = make(chan bool) //仅会在程序退出时关闭  不用于其他用途
-var global_device_orientation int32 = 0
+var global_close_signal = make(chan bool)  //仅会在程序退出时关闭  不用于其他用途
 var global_is_wordking_remote bool = false // 是否正在远程控制 并且无法获取触屏状态
+var global_device_orientation int32 = 0
 var global_screen_x int32 = 1000
 var global_screen_y int32 = 1000
 
@@ -180,6 +180,21 @@ func listen_device_orientation() {
 			}
 			time.Sleep(time.Duration(1) * time.Second)
 		}
+	}
+}
+
+func rotateAbsoluteXY(x, y int32) (int32, int32) { //根据方向旋转坐标
+	switch global_device_orientation {
+	case 0:
+		return x, y
+	case 1:
+		return 0x7ffffffe - y, x
+	case 2:
+		return 0x7ffffffe - x, 0x7ffffffe - y
+	case 3:
+		return y, 0x7ffffffe - x
+	default:
+		return x, y
 	}
 }
 
@@ -276,17 +291,6 @@ func get_dev_name_by_index(index int) string {
 	defer d.Close()
 	return d.Name()
 }
-
-// func get_dev_phys_info_by_index(index int) string {
-// 	fd, err := os.OpenFile(fmt.Sprintf("/dev/input/event%d", index), os.O_RDONLY, 0)
-// 	if err != nil {
-// 		return "read name error"
-// 	}
-// 	d := evdev.Open(fd)
-// 	defer d.Close()
-// 	return d.Name()
-// 	// return d
-// }
 
 func execute_view_move(handelerInstance *TouchHandler, x, stepValue, sleepMS int) {
 	handelerInstance.handel_view_move(0, 0)
@@ -749,7 +753,6 @@ func main() {
 						logger.Infof("启用触屏混合 %s(/dev/input/event%d) : %s", devName, index, devTypeFriendlyName[devType])
 						go dev_reader(touch_event_ch, index)
 						max_mt_x, max_mt_y = get_MT_size(map[int]bool{index: true})
-						// break
 					}
 				}
 			}
@@ -781,12 +784,13 @@ func main() {
 						}
 					}
 				})()
-				touch_control_func = handel_touch_using_hid_manager(port, *usingDeviceRotation)
+				touch_control_func = handel_touch_using_hid_manager(port)
 			} else if *usingOTGMode { //本机模拟成otg的触屏
 				global_is_wordking_remote = true
 				logger.Info("触屏控制将使用本机模拟为HID设备发送至主机")
 				logger.Infof("触屏方向：%d", *usingDeviceRotation)
-				touch_control_func = handel_touch_using_otg_manager(*usingDeviceRotation)
+				global_device_orientation = int32(*usingDeviceRotation)
+				touch_control_func = handel_touch_using_otg_manager()
 				go (func() {
 					for {
 						select {
@@ -799,12 +803,10 @@ func main() {
 			} else if *usingInputManagerID != -1 {
 				logger.Info("触屏控制将使用inputManager在本机处理")
 				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
-				go listen_device_orientation()
 				touch_control_func = handel_touch_using_input_manager(*usingInputManagerID)
 			} else {
 				logger.Info("触屏控制将使用uinput在本机处理")
 				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
-				go listen_device_orientation()
 				touch_control_func = handel_touch_using_uinput_touch()
 			}
 
@@ -818,8 +820,11 @@ func main() {
 				map_switch_signal,
 				*measure_sensitivity_mode,
 			)
-			if global_is_wordking_remote == false { //只有本机运行的时候 才有必要开启触屏混合
+			if global_is_wordking_remote { //只有本机运行的时候 才有必要开启触屏混合
+
+			} else {
 				go touchHandler.mix_touch(touch_event_ch, max_mt_x, max_mt_y)
+				go listen_device_orientation()
 			}
 			go touchHandler.auto_handel_view_release(*view_release_timeout)
 			go touchHandler.loop_handel_wasd_wheel()
