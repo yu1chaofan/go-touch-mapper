@@ -204,11 +204,11 @@ func check_dev_type(dev *evdev.Evdev) dev_type {
 	}
 	_, RelX := rel[evdev.RelativeX]
 	_, RelY := rel[evdev.RelativeY]
-	_, HWheel := rel[evdev.RelativeHWheel]
+	_, Wheel := rel[evdev.RelativeWheel]
 	_, MouseLeft := key[evdev.BtnLeft]
 	_, MouseRight := key[evdev.BtnRight]
-	if RelX && RelY && HWheel && MouseLeft && MouseRight {
-		return type_mouse //鼠标 检测XY 滚轮 左右中键
+	if RelX && RelY && Wheel && MouseLeft && MouseRight {
+		return type_mouse //鼠标 检测XY 滚轮 左右键
 	}
 	keyboard_keys := true
 	for i := evdev.KeyEscape; i <= evdev.KeyScrollLock; i++ {
