@@ -1,0 +1,24 @@
+name: sync-build
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["go-build-release"]
+    types:
+      - completed
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: downmload assets
+      run: |
+        mkdir releases 
+        wget https://github.com/RiderLty/go-touch-mapper/releases/latest/download/go-touch-mapper_amd64 -O ./releases/go-touch-mapper_amd64
+        wget https://github.com/RiderLty/go-touch-mapper/releases/latest/download/go-touch-mapper_arm64 -O ./releases/go-touch-mapper_arm64 
+  
+    - name: upload
+      run: |
+        curl -T "./releases/go-touch-mapper_amd64" -u "${{ secrets.WEBDAV_USERNAME }}:${{ secrets.WEBDAV_PASSWORD }}"  "${{ secrets.WEBDAV_ENDPOINT }}/build/go-touch-mapper_amd64"
+        curl -T "./releases/go-touch-mapper_arm64" -u "${{ secrets.WEBDAV_USERNAME }}:${{ secrets.WEBDAV_PASSWORD }}"  "${{ secrets.WEBDAV_ENDPOINT }}/build/go-touch-mapper_arm64"

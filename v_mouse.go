@@ -88,7 +88,7 @@ func (self *v_mouse_controller) main_loop() {
 		case <-global_close_signal:
 			return
 		case map_on := <-self.map_switch_signal:
-			logger.Infof("v_mouse map switch signal received: %v", map_on)
+			// logger.Infof("v_mouse map switch signal received: %v", map_on)
 			self.working = !map_on
 			if self.working {
 				self.display_mouse_control(true, self.left_downing, self.mouse_x, self.mouse_y)
