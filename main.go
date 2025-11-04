@@ -591,6 +591,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *debug_mode {
+		logger.WithDebug()
+		logger.Debug("debug on")
+	}
+
 	if *as_remote_control != "" {
 		ip, port, err := parseSenderAddress(*as_remote_control, 61069)
 		if err != nil {
@@ -619,7 +624,7 @@ func main() {
 				case <-global_close_signal:
 					return
 				case <-ticker.C:
-					logger.Infof("发送频率: %d Pack/s 发送数据量: %d B/s\r", pack_count, pack_size)
+					logger.Debugf("发送频率: %d Pack/s 发送数据量: %d B/s\r", pack_count, pack_size)
 					pack_count = 0
 					pack_size = 0
 				}
@@ -660,11 +665,6 @@ func main() {
 		if *usingInputManagerID != -1 && *usingHIDTouchTtyPath != "" {
 			logger.Error("无法同时使用inputManager与HID")
 			os.Exit(2)
-		}
-
-		if *debug_mode {
-			logger.WithDebug()
-			logger.Debug("debug on")
 		}
 
 		if *configPath == "" {
