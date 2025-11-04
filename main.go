@@ -490,10 +490,7 @@ func fileExists(filename string) bool {
 var configs embed.FS
 
 func main() {
-	if go_build_version == "" {
-		go_build_version = "DEVELOPMENT BUILD"
-	}
-	logger.Infof("当前构建版本: %v", go_build_version)
+
 	parser := argparse.NewParser("go-touch-mapper", " ")
 
 	var configPath *string = parser.String("c", "config", &argparse.Options{
@@ -596,6 +593,11 @@ func main() {
 		fmt.Print(parser.Usage(err))
 		os.Exit(1)
 	}
+
+	if go_build_version == "" {
+		go_build_version = "DEVELOPMENT BUILD"
+	}
+	logger.Infof("当前构建版本: %v", go_build_version)
 
 	if *debug_mode {
 		logger.WithDebug()
