@@ -418,7 +418,8 @@ func (self *TouchHandler) get_scaled_pos(x int32, y int32) (int32, int32) {
 }
 
 func (self *TouchHandler) touch_require(x int32, y int32, scale uint8) int32 {
-
+	self.touch_control_lock.Lock()
+	defer self.touch_control_lock.Unlock()
 	for i, v := range self.allocated_id {
 		if !v {
 			self.allocated_id[i] = true
@@ -428,7 +429,7 @@ func (self *TouchHandler) touch_require(x int32, y int32, scale uint8) int32 {
 				scaled_x, scaled_y := self.get_scaled_pos(x, y)
 				self.send_touch_control_pack(TouchActionRequire, int32(i), scaled_x, scaled_y)
 			}
-			logger.Debugf("touch require (%v,%v) <= [%v]", x, y, i)
+			logger.Debugf("touch require [%v] => (%v,%v)", i, x, y)
 			return int32(i)
 		}
 	}
@@ -436,6 +437,8 @@ func (self *TouchHandler) touch_require(x int32, y int32, scale uint8) int32 {
 }
 
 func (self *TouchHandler) touch_release(id int32) int32 {
+	self.touch_control_lock.Lock()
+	defer self.touch_control_lock.Unlock()
 	logger.Debugf("touch release [%v]", id)
 	if id != -1 {
 		self.allocated_id[int(id)] = false
@@ -445,6 +448,8 @@ func (self *TouchHandler) touch_release(id int32) int32 {
 }
 
 func (self *TouchHandler) touch_move(id int32, x int32, y int32, scale uint8) {
+	self.touch_control_lock.Lock()
+	defer self.touch_control_lock.Unlock()
 	logger.Debugf("touch move to (%v,%v) [%v]", x, y, id)
 	if id != -1 {
 		if scale == 0 {
@@ -466,8 +471,6 @@ func (self *TouchHandler) u_input_control(action int8, arg1 int32, arg2 int32) {
 }
 
 func (self *TouchHandler) send_touch_control_pack(action int8, id int32, x int32, y int32) {
-	self.touch_control_lock.Lock()
-	defer self.touch_control_lock.Unlock()
 	self.touch_control_func(touch_control_pack{
 		action:   action,
 		id:       id,
@@ -815,17 +818,13 @@ func (self *TouchHandler) switch_map_mode() {
 	self.total_move_x = 0
 	self.total_move_y = 0                           //总移动距离清零
 	self.view_id = self.touch_release(self.view_id) //视角id释放
-
 	self.key_action_state_save.Range(func(key, value interface{}) bool {
 		self.execute_key_action(time.Now(), key.(string), UP, self.config.Get("KEY_MAPS").Get(key.(string)), value)
 		logger.Infof("已释放key:%s", key.(string))
 		return true
 	})
-
-	self.map_on = !self.map_on     //切换
-	self.map_switch_signal <- true //发送信号到v_mouse切换显示
-
-	// logger.Infof("map_on:%v", self.map_on)
+	self.map_on = !self.map_on            //切换
+	self.map_switch_signal <- self.map_on //发送信号到v_mouse切换显示
 	if self.map_on {
 		logger.Info("映射[on]")
 	} else {
@@ -897,9 +896,10 @@ func (self *TouchHandler) handel_key_up_down(key_name string, up_down int32, dev
 				return
 			}
 		}
-		if action, ok := self.config.Get("KEY_MAPS").CheckGet(key_name); ok {
-			state, ok := self.key_action_state_save.Load(key_name)
-			if (up_down == UP && !ok) || (up_down == DOWN && ok) {
+		if action, exist := self.config.Get("KEY_MAPS").CheckGet(key_name); exist {
+			state, contains := self.key_action_state_save.Load(key_name)
+			if (up_down == UP && !contains) || (up_down == DOWN && contains) {
+				logger.Errorf("key[%s]%s\t状态异常，忽略此次事件", key_name, UDF[up_down])
 			} else {
 				// logger.Debugf("key[%s]%s\t%v\t%v", key_name, UDF[up_down], action, state)
 				self.execute_key_action(time.Now(), key_name, up_down, action, state)
@@ -908,7 +908,7 @@ func (self *TouchHandler) handel_key_up_down(key_name string, up_down int32, dev
 			logger.Debugf("key[%s]\t无触屏映射", key_name)
 		}
 	} else {
-		if jsconfig, ok := self.joystickInfo[dev_name]; ok {
+		if jsconfig, exist := self.joystickInfo[dev_name]; exist {
 			//如果是手柄 则检查是否设置了键盘映射
 			if joystick_btn_map_key_name, ok := jsconfig.Get("MAP_KEYBOARD").CheckGet(key_name); ok {
 				//有则映射到普通按键
@@ -917,7 +917,7 @@ func (self *TouchHandler) handel_key_up_down(key_name string, up_down int32, dev
 				logger.Debugf("joyStick[%s]\tkey[%s]\t无键盘映射", dev_name, key_name)
 			}
 		} else {
-			if code, ok := friendly_name_2_keycode[key_name]; ok {
+			if code, exist := friendly_name_2_keycode[key_name]; exist {
 				//是合法按键 则输出
 				self.u_input_control(UInput_key_event, int32(code), int32(up_down))
 			}
@@ -1135,24 +1135,21 @@ func (self *TouchHandler) handel_event() {
 					}
 				}
 			}
-			var perfPoint time.Time
-
+			// var perfPoint time.Time
 			if x != 0 || y != 0 || HWhell != 0 || Wheel != 0 {
-				perfPoint = time.Now()
+				// perfPoint = time.Now()
 				self.handel_rel_event(x, y, HWhell, Wheel)
-				logger.Debugf("rel_event\t%v \n", time.Since(perfPoint))
+				// logger.Debugf("rel_event\t%v \n", time.Since(perfPoint))
 			}
 			if len(key_events) != 0 {
-				perfPoint = time.Now()
+				// perfPoint = time.Now()
 				self.handel_key_events(key_events, event_pack.dev_type, event_pack.dev_name)
-				key_sin := time.Since(perfPoint)
-				logger.Debugf("key_events\t%v \n", key_sin)
+				// logger.Debugf("key_events\t%v \n", time.Since(perfPoint))
 			}
 			if len(abs_events) != 0 {
-				perfPoint = time.Now()
+				// perfPoint = time.Now()
 				self.handel_abs_events(abs_events, event_pack.dev_type, event_pack.dev_name)
-				abs_sin := time.Since(perfPoint)
-				logger.Debugf("abs_events\t%v \n", abs_sin)
+				// logger.Debugf("abs_events\t%v \n", time.Since(perfPoint))
 			}
 			// logger.Debugf("event pack:%v", event_pack)
 		}

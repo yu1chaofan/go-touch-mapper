@@ -87,12 +87,18 @@ func (self *v_mouse_controller) main_loop() {
 		select {
 		case <-global_close_signal:
 			return
-		case <-self.map_switch_signal:
-			self.working = !self.working
+		case map_on := <-self.map_switch_signal:
+			logger.Infof("v_mouse map switch signal received: %v", map_on)
+			self.working = !map_on
 			if self.working {
 				self.display_mouse_control(true, self.left_downing, self.mouse_x, self.mouse_y)
 			} else {
 				self.display_mouse_control(false, false, 0, 0)
+				if self.left_downing {
+					self.left_downing = false
+					self.touchHandlerInstance.touch_release(self.mouse_id)
+					self.mouse_id = -1
+				}
 			}
 		case data := <-self.uinput_in:
 			if data.action == UInput_mouse_move {
@@ -156,15 +162,13 @@ func (self *v_mouse_controller) on_mouse_move(rel_x, rel_y int32) {
 func (self *v_mouse_controller) on_left_btn(up_down int32) {
 	if self.working {
 		if up_down == DOWN {
-			if self.left_downing == true { //重复的按下，可能是丢失松开事件了
-				self.touchHandlerInstance.touch_release(self.mouse_id)
-			}
 			self.left_downing = true
 			self.mouse_id = self.touchHandlerInstance.touch_require(self.mouse_x, self.mouse_y, touch_pos_scale)
 
 		} else {
 			self.left_downing = false
 			self.touchHandlerInstance.touch_release(self.mouse_id)
+			self.mouse_id = -1
 		}
 		self.on_mouse_move(0, 0)
 	} else {
