@@ -75,7 +75,7 @@ func create_u_input_touch_screen(width int32, height int32) *os.File {
 	absMax[absMtTrackingId] = 65535
 
 	uiDev := UinputUserDev{
-		Name: toUInputName([]byte("v_touch_screen")),
+		Name: toUInputName([]byte("fts")),
 		ID: InputID{
 			BusType: 0,
 			Vendor:  randUInt16Num(0x2000),
@@ -173,7 +173,7 @@ func create_u_input_mouse_keyboard() *os.File {
 	}
 
 	uiDev := UinputUserDev{
-		Name: toUInputName([]byte("go-touch-mapper-virtual-device")),
+		Name: toUInputName([]byte(uinput_keyboard_mouse_dev_name)),
 		ID: InputID{
 			BusType: 0,
 			Vendor:  randUInt16Num(0x2000),

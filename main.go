@@ -24,6 +24,7 @@ import (
 )
 
 var go_build_version string = ""
+var uinput_keyboard_mouse_dev_name = ""
 
 type event_pack struct {
 	//表示一个动作 由一系列event组成
@@ -420,7 +421,7 @@ func auto_detect_and_read(event_chan chan *event_pack, patern string) {
 			}
 			for index, devType := range auto_detect_result {
 				devName := get_dev_name_by_index(index)
-				if devName == "go-touch-mapper-virtual-device" {
+				if devName == uinput_keyboard_mouse_dev_name {
 					continue //跳过生成的虚拟设备
 				}
 				re := regexp.MustCompile(patern)
@@ -599,8 +600,9 @@ func main() {
 	}
 
 	if go_build_version == "" {
-		go_build_version = "DEVELOPMENT BUILD"
+		go_build_version = "DEV"
 	}
+	uinput_keyboard_mouse_dev_name = fmt.Sprintf("EVO80_Keyboard_%s", go_build_version)
 	logger.Infof("当前构建版本: %v", go_build_version)
 
 	if *debug_mode {
@@ -808,6 +810,7 @@ func main() {
 				logger.Info("触屏控制将使用uinput在本机处理")
 				go handel_u_input_mouse_keyboard(fileted_u_input_control_ch)
 				touch_control_func = handel_touch_using_uinput_touch()
+
 			}
 
 			map_switch_signal := make(chan bool) //通知虚拟鼠标当前为鼠标还是映射模式
