@@ -566,13 +566,13 @@ func main() {
 	var using_v_mouse *bool = parser.Flag("v", "v-mouse", &argparse.Options{
 		Required: false,
 		Default:  false,
-		Help:     "用触摸操作模拟鼠标,需要额光标外显示程序",
+		Help:     "用触摸操作模拟鼠标,需要额光标外显示程序，同时可用于在HID与OTG模式下获取屏幕方向",
 	})
 
 	var using_remote_v_mouse *string = parser.String("", "v-mouse-addr", &argparse.Options{
 		Required: false,
 		Default:  "",
-		Help:     "模拟光标显示程序地址，默认本机6533端口，输入 IP:PORT 例如 192.168.3.7:61069 或者仅输入IP使用默认端口6533",
+		Help:     "模拟光标显示程序地址，默认本机6533端口，输入 IP:PORT 例如 192.168.3.7:6533 或者仅输入IP使用默认端口6533",
 	})
 
 	var view_release_timeout *int = parser.Int("", "auto-release", &argparse.Options{
@@ -827,7 +827,9 @@ func main() {
 
 			} else {
 				go touchHandler.mix_touch(touch_event_ch, max_mt_x, max_mt_y)
-				go listen_device_orientation()
+				if !*using_v_mouse {
+					go listen_device_orientation()
+				}
 			}
 			go touchHandler.auto_handel_view_release(*view_release_timeout)
 			go touchHandler.loop_handel_wasd_wheel()
@@ -867,6 +869,7 @@ func main() {
 			}
 
 			if *using_remote_control {
+				logger.Errorf("使用远程控制中。。。。")
 				go udp_event_injector(events_ch, *port)
 			}
 

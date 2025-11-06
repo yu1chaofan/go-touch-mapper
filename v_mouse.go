@@ -28,24 +28,67 @@ func init_v_mouse_controller(
 	map_switch_signal chan bool,
 	addr net.UDPAddr,
 ) *v_mouse_controller {
-	udp_ch := make(chan []byte)
+	udp_write_ch := make(chan []byte)
 	go (func() {
-		socket, err := net.DialUDP("udp", nil, &addr)
+		// socket, err := net.DialUDP("udp", nil, &addr)
+		localAddr, err := net.ResolveUDPAddr("udp", ":0") // 使用随机本地端口
+		if err != nil {
+			logger.Errorf("解析本地地址失败: %s", err.Error())
+			os.Exit(3)
+		}
+		socket, err := net.ListenUDP("udp", localAddr)
+		if err != nil {
+			logger.Errorf("udp error : %v", err)
+			return
+		}
 		if err != nil {
 			logger.Errorf("连接v_mouse失败 : %s", err.Error())
 			os.Exit(3)
 		}
 		defer socket.Close()
+		localAddrReal := socket.LocalAddr().(*net.UDPAddr)
+		logger.Infof("v_mouse服务启动在端口: %d", localAddrReal.Port)
+
+		// 启动读取goroutine
+		udpRecvCh := make(chan []byte, 100) // 缓冲大小可以根据需要调整
+		go func() {
+			readBuffer := make([]byte, 32)
+			for {
+				select {
+				case <-global_close_signal:
+					close(udpRecvCh) // 关闭管道
+					return
+				default:
+					n, remoteAddr, err := socket.ReadFromUDP(readBuffer)
+					if err != nil {
+						if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+							continue
+						}
+						logger.Errorf("读取UDP数据失败: %s", err.Error())
+						continue
+					}
+					if n > 0 {
+						data := make([]byte, n)
+						copy(data, readBuffer[:n])
+						global_device_orientation = int32(data[0])
+						logger.Infof("从 %s 接收到 vpoint上报屏幕方向 %d ", remoteAddr.String(), int32(data[0]))
+
+					}
+				}
+			}
+		}()
+
 		for {
 			select {
 			case <-global_close_signal:
 				return
 			default:
-				data := <-udp_ch
-				socket.Write(data)
+				data := <-udp_write_ch
+				socket.WriteToUDP(data, &addr)
 			}
 		}
 	})()
+
 	screen_x, screen_y := int32(0), int32(0)
 	if global_is_wordking_remote {
 		screen_x = global_screen_x
@@ -62,7 +105,7 @@ func init_v_mouse_controller(
 		left_downing:         false,
 		mouse_x:              0,
 		mouse_y:              0,
-		udp_write_ch:         udp_ch,
+		udp_write_ch:         udp_write_ch,
 		mouse_id:             -1,
 		screen_x:             screen_x,
 		screen_y:             screen_y,
