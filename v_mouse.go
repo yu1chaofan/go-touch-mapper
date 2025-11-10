@@ -71,8 +71,7 @@ func init_v_mouse_controller(
 						data := make([]byte, n)
 						copy(data, readBuffer[:n])
 						global_device_orientation = int32(data[0])
-						logger.Infof("从 %s 接收到 vpoint上报屏幕方向 %d ", remoteAddr.String(), int32(data[0]))
-
+						logger.Debugf("从 %s 接收到 vpoint上报屏幕方向 %d ", remoteAddr.String(), int32(data[0]))
 					}
 				}
 			}

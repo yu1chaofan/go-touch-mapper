@@ -104,7 +104,6 @@ const CostumedInput = ({ defaultValue, width, onCommit }) => {
     const [value, setValue] = useState(defaultValue)
     return <Input
         sx={{ width: width || "40px" }}
-        // inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
         value={value}
         onChange={(e) => {
             setValue(e.target.value)

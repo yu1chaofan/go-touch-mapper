@@ -259,8 +259,11 @@ export default function ConfigManager() {
         // setUploadButton(false);
         const reads = new FileReader();
         reads.readAsDataURL(document.getElementById('fileInput').files[0]);
-        reads.onload = function (e) {
-            setImgUrl(this.result);
+        reads.onload = async function (e) {
+            // setImgUrl(this.result);
+            // document.body.requestFullscreen();
+            const bas64STR = await imageUrlToBase64(this.result)
+            setConfig(produce(draft => { draft.IMG = bas64STR }))
             document.body.requestFullscreen();
         };
     }
@@ -442,7 +445,15 @@ export default function ConfigManager() {
                                 marginTop: "10px",
                             }}
                         >{"5s后获取截图"}</Button>
-
+                    </Grid>
+                    <Grid item xs={12}>
+                        <Button
+                            onClick={() => { document.getElementById('fileInput').click(); }}
+                            variant="outlined"
+                            sx={{
+                                width: "100%",
+                            }}
+                        >{"上传截图"}</Button>
                     </Grid>
                 </Grid>
                 <Button
@@ -1062,5 +1073,7 @@ export default function ConfigManager() {
             shift_range={config["WHEEL"]["SHIFT_RANGE_ENABLE"] ? getPostionValueX(config["WHEEL"]["SHIFT_RANGE"]) : 0}
         />
         <ViewShow x={getPostionValueX(config["MOUSE"]["POS"][0])} y={getPostionValueY(config["MOUSE"]["POS"][1])} />
+        <input id="fileInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleFileChange} ></input>
+
     </div>
 }

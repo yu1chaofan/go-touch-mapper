@@ -37,7 +37,7 @@ jobs:
     
     - name: Get version
       id: get_version
-      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      run: echo "VERSION=${{github.event.client_payload.tag}}" >>$GITHUB_OUTPUT
       
     - name: Build amd64
       run: CGO_ENABLE=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.go_build_version=${{ steps.get_version.outputs.VERSION }}" -o go-touch-mapper_amd64
