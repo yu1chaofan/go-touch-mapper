@@ -49,13 +49,13 @@ CGO_ENABLE=0 GOOS=linux go build -ldflags="-s -w"
 
 ```
 usage: go-touch-mapper [-h|--help] [-c|--config "<value>"] [--create-js-info]
-                       [--pattern "<value>"] [-t|--touch-disabled]
-                       [-i|--inputManager <integer>] [--tty-path "<value>"]
-                       [--otg] [--rotation <integer>] [-r|--remoteControl]
-                       [-s|--sender "<value>"] [-p|--port <integer>]
-                       [-v|--v-mouse] [--v-mouse-addr "<value>"]
+                       [--pattern "<value>"] [-s|--sender "<value>"] [-m|--mode
+                       "<value>"] [-t|--disable-mix] [-u|--disable-uinput]
+                       [--display-id <integer>] [--tty-path "<value>"]
+                       [--rotation <integer>] [-r|--remote-control] [-p|--port
+                       <integer>] [-v|--v-mouse] [--v-mouse-addr "<value>"]
                        [--auto-release <integer>] [--measure-mode]
-                       [-d|--debug_mode]
+                       [-d|--debug-mode]
 
                         
 
@@ -66,39 +66,46 @@ Arguments:
                         指定配置文件路径，如果不存在则会使用默认模板创建
       --create-js-info  创建手柄配置文件模式. Default: false
       --pattern         用于筛选设备名称的正则. Default: .*
-  -t  --touch-disabled  关闭触屏混合. Default: false
-  -i  --inputManager    DisplayID 使用inputManager控制触摸
-                        ，可用于控制外接显示器 . Default: -1
-      --tty-path        串口设备路径
-                        将使用串口控制外接的HID设备模拟触屏.
-                        Default: 
-      --otg             使用OTG模式将本机模拟为HID触屏. Default:
-                        false
-      --rotation       
-                        在HID与OTG模式下手动指定设备的旋转方向，默认为
-                        1 (横屏) ，可用选值有 0(竖屏) 1(横屏)
-                        2(反向竖屏) 3(反向横屏). Default: 1
-  -r  --remoteControl   是否从UDP接收远程事件. Default: false
   -s  --sender          发送本地事件到远程，输入 IP:PORT 例如
                         192.168.3.7:61069
                         或者仅输入IP使用默认端口61069. Default: 
+  -m  --mode            触摸方案，可用控制模式:   
+                                uinput:         使用uinput创建虚拟触屏 
+                                inputmanager:   通过UDS控制安卓inputManager
+                                hid:            通过串口控制单片机模拟usb触屏 
+                                otg:            本机配置LinuxUSBgadget模拟usb触屏,设备文件为/dev/hidg0
+                                direct:         直接写入设备真实触屏,需要root权限或者低版本安卓.
+                        Default: uinput
+  -t  --disable-mix    
+                        关闭触屏混合,仅在uinput与inputmanager模式生效.
+                        Default: false
+  -u  --disable-uinput 
+                        不再创建uinput鼠标键盘设备,仅在uinput、inputmanager与direct模式生效.
+                        Default: false
+      --display-id     
+                        显示器ID,仅inputmanager模式生效,多显示器情况下可控制额外的显示器.
+                        Default: 0
+      --tty-path        串口设备路径,hid模式下必须指定. Default: 
+      --rotation       
+                        手动指定屏幕方向,仅在hid与otg模式下需要(建议使用-v).
+                        Default: 1
+  -r  --remote-control  是否从UDP接收远程事件. Default: false
   -p  --port           
                         指定监听远程事件的UDP端口号与控制后台端口.
                         Default: 61069
   -v  --v-mouse        
-                        用触摸操作模拟鼠标,需要额光标外显示程序.
+                        用触摸操作模拟鼠标,需要额光标外显示程序vPointer,同时可用于在hid与otg模式下获取屏幕方向.
                         Default: false
       --v-mouse-addr   
-                        模拟光标显示程序地址，默认本机6533端口，输入
-                        IP:PORT 例如 192.168.3.7:61069
-                        或者仅输入IP使用默认端口6533. Default: 
+                        模拟光标显示程序地址,默认本机6533端口,输入IP:PORT,例如192.168.3.7:6533,或者仅输入IP使用默认端口6533.
+                        Default: 
       --auto-release   
                         触发视角自动释放所需的静止ms数,50ms为检查单位,置0禁用.
                         Default: 200
       --measure-mode   
-                        显示视角移动像素计数,且可输入数值模拟滑动,方向键可微调.
+                        显示视角移动像素计数,且可输入数值模拟滑动,方向键可微调,用于测试灵敏度.
                         Default: false
-  -d  --debug_mode      打印debug信息. Default: fals
+  -d  --debug-mode      打印debug信息. Default: false
 ```
 ## 运行示例
 
@@ -107,7 +114,6 @@ Arguments:
 ```
 
 如果df.json不存在，会从模板创建配置文件。
-
 
 ## 映射开关
 默认键盘使用 ` 键，可在配置文件中手动修改，手柄固定为SELECT+RS组合键
@@ -124,13 +130,85 @@ Arguments:
 
 灵敏度设置 MOUSE:SPEED:[ x , y ] float64类型，此数值也会影响右摇杆控制视角的速度
 
+
+# 触摸输出模式选择 -m
+
+## uinput
+
+默认参数
+
+使用uinput创建虚拟触屏，也是最推荐的模式
+
+## [InputManager](https://github.com/RiderLty/inputManager-touch-interface)
+
+使用参数```-m inputmanager```启用
+
+由Scrcpy修改而来，使用app_process启动
+
+通过 Unix Domain Socket 与主程序通信控制触屏
+
+在多显示器情况下可以使用```--display-id```指定displayID
+
+只可在adb shell下使用
+
+
+## HID触屏
+
+使用参数```-m hid```启用
+
+使用ESP32-s3的HID库，创建一个外置触屏，在上位机通过串口通信的方式发送触摸指令
+
+优点在于无需在被控设备上安装任何软件或者执行指令
+
+### 使用方式
+
+* 刷入hid_touch.ino固件   [点击在线烧录](https://riderlty.github.io/go-touch-mapper/)
+
+* 将键鼠手柄与ESP32-s3的串口连接到例如树莓派之类的linux设备上，USB口连接到被控设备
+
+* 执行 ```ls /dev | grep ttyACM``` 查看串口设备
+
+* 使用--tty-path指定串口设备，--rotation 指定旋转方向，例如：```./go-touch-mapper--tty-path /dev/ttyACM0 ``` 
+
+* 实测回报率在1000hz以下无明显延迟，超过1000hz会出现操作丢失。
+
+* 部分设备会出现输入迟缓的情况，建议降低输入设备的回报率到500hz或者更低。
+
+## OTG模式
+
+使用参数```-m otg```启用
+
+* 树莓派5，安装 [pi-gadget-hid](https://github.com/RiderLty/pi-gadget-hid)
+
+* 通过type-c供电数据分离线，为树莓派供电同时，数据线连接主机
+
+* 使用 --otg 参数 并且手动指定旋转方向 --rotation
+
+* 将键鼠插在树莓派上即可控制
+
+## 真实触屏设备文件
+
+使用参数```-m direct```启用
+
+直接写入设备的真实触屏，需要root权限
+
+搭配```-r -t -u```参数，不创建任何虚拟设备，仅接收UDP事件处理后直接写入真实触屏
+
+⚠ ⚠ ⚠ 绝对不要同时使用映射的同时手指点击屏幕
+
 ## 触屏混合
 
-程序会创建额外的uinput虚拟触屏来进行输入，默认会识别并读取机器物理触屏输入，与键鼠混合后使用虚拟触屏输出以实现映射开启时，触摸屏幕不中断操作。
+程序会识别并读取机器物理触屏输入，与键鼠混合后使用虚拟触屏输出以实现映射开启时，触摸屏幕不中断操作。
 
 可使用-t禁用此功能
 
 ⚠ 如果是在手机端进行配置文件的修改，建议禁用，避免无法操作手机。
+
+## uinput键鼠
+
+会将所有的设备包括远程事件混合后使用uinput创建的键鼠输出。
+
+可使用-u禁用创建uinput键鼠
 
 ## [虚拟光标显示程序](https://github.com/RiderLty/vPointer)
 
@@ -141,6 +219,8 @@ Arguments:
 适用于某些屏蔽了鼠标点击的游戏
 
 使用串口与树莓派otg模式时候，可设置--v-mouse-addr以操控手机端显示光标
+
+此时会忽略 --rotation 指定的方向并自动识别
 
 ## 手柄支持
 joystickInfos文件夹下json文件为手柄配置文件
@@ -171,63 +251,24 @@ joystickInfos文件夹下json文件为手柄配置文件
 
 PC上 修改remote_control中sender("192.168.1.64:61069")为手机IP，端口默认可不修改
 
-或者下载[打包的exe](remote_control/dist/remote_control.exe)
-
-在同目录创建[addr.txt](remote_control/dist/addr.txt)，写入要控制设备的IP:端口
-
 运行
 
 ``` 
 python remote_control.py 
 ```
 
+
+或者下载[打包的exe](remote_control/dist/remote_control.exe)
+
+在同目录创建[addr.txt](remote_control/dist/addr.txt)，写入要控制设备的IP:端口后运行
+
 或者使用 -s 参数，将本机变为远程控制发送端
 
-在另一台安卓手机或者linux设备上发送控制指令
+实现在另一台安卓手机或者linux设备上发送控制指令
 ```
 ./go-touch-mapper -s 127.0.0.1
 ```
 
-
-## HID触屏
-
-使用ESP32-s3的HID库，创建一个外置触屏，在上位机通过串口通信的方式发送触摸指令
-
-优点在于无需在被控设备上安装任何软件或者执行指令
-
-### 使用方式
-
-* 刷入hid_touch.ino固件   [点击在线烧录](https://riderlty.github.io/go-touch-mapper/)
-
-* 将键鼠手柄与ESP32-s3的串口连接到例如树莓派之类的linux设备上，USB口连接到被控设备
-
-* 执行 ```ls /dev | grep ttyACM``` 查看串口设备
-
-* 使用--tty-path指定串口设备，--rotation 指定旋转方向，例如：```./go-touch-mapper--tty-path /dev/ttyACM0 ``` 
-
-* 实测回报率在1000hz以下无明显延迟，超过1000hz会出现操作丢失。
-
-* 部分设备会出现输入迟缓的情况，建议降低输入设备的回报率到500hz或者更低。
-
-## OTG模式
-
-* 树莓派5，安装 [pi-gadget-hid](https://github.com/RiderLty/pi-gadget-hid)
-
-* 通过type-c供电数据分离线，为树莓派供电同时，数据线连接主机
-
-* 使用 --otg 参数 并且手动指定旋转方向 --rotation
-
-* 将键鼠插在树莓派上即可控制
-
-## [InputManager](https://github.com/RiderLty/inputManager-touch-interface)
-### 说明
-由Scrcpy修改而来，使用app_process启动
-
-通过 Unix Domain Socket 与主程序通信控制触屏
-
-在多显示器情况下使用```-i```指定displayID
-
-只可在adb shell下使用
 
 ## ADB 下载
 

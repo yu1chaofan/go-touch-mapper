@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 type v_mouse_controller struct {
@@ -19,6 +20,7 @@ type v_mouse_controller struct {
 	screen_x             int32
 	screen_y             int32
 	map_switch_signal    chan bool
+	wheel_move_chan      chan int32
 }
 
 func init_v_mouse_controller(
@@ -95,6 +97,7 @@ func init_v_mouse_controller(
 	} else {
 		screen_x, screen_y = get_wm_size()
 	}
+	wheel_move_chan := make(chan int32, 100)
 
 	return &v_mouse_controller{
 		touchHandlerInstance: touchHandlerInstance,
@@ -109,6 +112,7 @@ func init_v_mouse_controller(
 		screen_x:             screen_x,
 		screen_y:             screen_y,
 		map_switch_signal:    map_switch_signal,
+		wheel_move_chan:      wheel_move_chan,
 	}
 }
 
@@ -145,6 +149,10 @@ func (self *v_mouse_controller) main_loop() {
 		case data := <-self.uinput_in:
 			if data.action == UInput_mouse_move {
 				self.on_mouse_move(data.arg1, data.arg2)
+			} else if data.action == UInput_mouse_wheel {
+				if data.arg1 == REL_WHEEL {
+					go self.on_hwheel_action(data.arg2)
+				}
 			} else {
 				if data.arg1 >= 0x110 && data.arg1 <= 0x117 {
 					if data.arg1 == 0x110 {
@@ -219,12 +227,63 @@ func (self *v_mouse_controller) on_left_btn(up_down int32) {
 	}
 }
 
-// func (self *v_mouse_controller) on_hwheel_action(value int32) { //有待优化
-// 	if self.working {
-// 		hwheel_id := self.touchHandlerInstance.touch_require(self.mouse_x, self.mouse_y, touch_pos_scale)
-// 		self.touchHandlerInstance.touch_move(hwheel_id, self.mouse_x, self.mouse_y+value, touch_pos_scale)
-// 		self.touchHandlerInstance.touch_release(hwheel_id)
-// 	} else {
-// 		logger.Error("ERROR: hwheel_action: not working")
-// 	}
-// }
+func (self *v_mouse_controller) on_hwheel_action(value int32) { //有待优化
+	if self.working {
+		self.wheel_move_chan <- value * -40
+	} else {
+		logger.Error("ERROR: hwheel_action: not working")
+	}
+}
+
+func (self *v_mouse_controller) loop_handel_v_mouse_wheel_move() {
+	var wheel_move_id int32 = -1
+	wheel_x := self.mouse_x
+	wheel_y := self.mouse_y
+	counter := 0
+	for {
+		select {
+		case <-global_close_signal:
+			return
+		case value := <-self.wheel_move_chan:
+			counter = 0
+			max_x, max_y := self.get_max_xy_val()
+			if wheel_move_id == -1 {
+				if self.mouse_y+value < 0 || self.mouse_y+value > max_y {
+					continue
+				} else {
+					wheel_move_id = self.touchHandlerInstance.touch_require(int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y)*0x7ffffffe/int64(max_y)), false)
+					self.touchHandlerInstance.touch_move(wheel_move_id, int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y+value)*0x7ffffffe/int64(max_y)), false)
+					wheel_x = self.mouse_x
+					wheel_y = self.mouse_y + value
+				}
+			} else {
+				if wheel_y+value < 0 || wheel_y+value > max_y {
+					self.touchHandlerInstance.touch_release(wheel_move_id)
+					wheel_move_id = self.touchHandlerInstance.touch_require(int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y)*0x7ffffffe/int64(max_y)), false)
+					self.touchHandlerInstance.touch_move(wheel_move_id, int32(int64(self.mouse_x)*0x7ffffffe/int64(max_x)), int32(int64(self.mouse_y+value)*0x7ffffffe/int64(max_y)), false)
+					wheel_x = self.mouse_x
+					wheel_y = self.mouse_y + value
+				} else {
+					self.touchHandlerInstance.touch_move(wheel_move_id, int32(int64(wheel_x)*0x7ffffffe/int64(max_x)), int32(int64(wheel_y+value)*0x7ffffffe/int64(max_y)), false)
+					wheel_y += value
+				}
+			}
+		default:
+			if counter < 200 {
+				counter++
+				time.Sleep(time.Duration(1) * time.Millisecond)
+				if counter == 200 {
+					if wheel_move_id != -1 {
+						max_x, max_y := self.get_max_xy_val()
+						self.touchHandlerInstance.touch_move(wheel_move_id, int32(int64(wheel_x)*0x7ffffffe/int64(max_x+1)), int32(int64(wheel_y)*0x7ffffffe/int64(max_y)), false)
+						time.Sleep(time.Duration(1) * time.Millisecond)
+						self.touchHandlerInstance.touch_move(wheel_move_id, int32(int64(wheel_x)*0x7ffffffe/int64(max_x-1)), int32(int64(wheel_y)*0x7ffffffe/int64(max_y)), false)
+						time.Sleep(time.Duration(1) * time.Millisecond)
+						self.touchHandlerInstance.touch_release(wheel_move_id)
+						wheel_move_id = -1
+					}
+				}
+			}
+		}
+	}
+}

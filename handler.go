@@ -57,7 +57,6 @@ type TouchHandler struct {
 	BTN_SELECT_UP_DOWN      int32
 	// KEYBOARD_SWITCH_KEY_NAME  string
 	KEYBOARD_SWITCH_KEY_NAME_S map[string]bool //键盘切换映射的按键集合
-	view_range_limited         bool            //视角是否有界
 	map_switch_signal          chan bool
 	measure_sensitivity_mode   bool  //计算模式
 	total_move_x               int32 //视角总移动距离x
@@ -125,7 +124,6 @@ func InitTouchHandler(
 	events chan *event_pack,
 	touch_control_func touch_control_func,
 	u_input chan *u_input_control_pack,
-	view_range_limited bool,
 	map_switch_signal chan bool,
 	measure_sensitivity_mode bool,
 ) *TouchHandler {
@@ -353,7 +351,6 @@ func InitTouchHandler(
 		BTN_SELECT_UP_DOWN:      0,
 		// KEYBOARD_SWITCH_KEY_NAME:  config_json.Get("MOUSE").Get("SWITCH_KEY").MustString(),
 		KEYBOARD_SWITCH_KEY_NAME_S: KEYBOARD_SWITCH_KEY_NAME_S,
-		view_range_limited:         view_range_limited,
 		map_switch_signal:          map_switch_signal,
 		measure_sensitivity_mode:   measure_sensitivity_mode,
 		wheel_shift_enable:         config_json.Get("WHEEL").Get("SHIFT_RANGE_ENABLE").MustBool(),
@@ -517,30 +514,6 @@ func (self *TouchHandler) handel_view_move(offset_x int32, offset_y int32) { //�
 	}
 	self.view_current_x += offset_x * self.view_speed_x
 	self.view_current_y += offset_y * self.view_speed_y
-	// if self.view_range_limited { //有界 or 无界 即 使用eventX 还是 inputManager
-	// 	if self.view_current_x <= 0 || self.view_current_x >= 0xfffffe || self.view_current_y <= 0 || self.view_current_y >= 0xfffffe {
-	// 		//测试了两个软件
-	// 		//都可以同时两个触摸点控制视角
-	// 		//所以这里超出范围时候逻辑修改了
-	// 		//原本的点的目标超出了 但是暂时不释放
-	// 		//此时去申请一个新的触控点来执行本次滑动操作
-	// 		//然后再将原本的触控点释放 并将新的触控点设置为当前控制用的触控点
-	// 		//即从原本的瞬间松开再按下 改为了按下新的再松开
-	// 		self.view_current_x = self.view_init_x + rand_offset()
-	// 		self.view_current_y = self.view_init_y + rand_offset()
-	// 		tmp_view_id := self.touch_require(self.view_current_x, self.view_current_y, 0)
-	// 		self.view_current_x += offset_x * self.view_speed_x //用的时直接写event坐标系
-	// 		self.view_current_y += offset_y * self.view_speed_y
-	// 		self.touch_move(tmp_view_id, self.view_current_x, self.view_current_y, 0)
-	// 		self.touch_release(self.view_id)
-	// 		self.view_id = tmp_view_id
-	// 	} else {
-	// 		self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
-	// 	}
-	// } else {
-	// 	self.touch_move(self.view_id, self.view_current_x, self.view_current_y, 0)
-	// }
-	// 采用了0x7ffffffe作为边界的情况下，所情况有都为有界
 	if self.view_current_x < 0 || self.view_current_y < 0 { //出现负数 表示到达边界
 		self.view_current_x, self.view_current_y = self.get_scaled_pos(self.view_init_x+rand_offset(), self.view_init_y+rand_offset())
 		tmp_view_id := self.touch_require(self.view_current_x, self.view_current_y, false)
@@ -1027,9 +1000,7 @@ func (self *TouchHandler) handel_abs_events(events []*evdev.Event, dev_type dev_
 	}
 }
 
-func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max_mt_y int32) {
-	wm_size_x, wm_size_y := get_wm_size()
-	logger.Infof("xy_wmsize:(%d,%d)", wm_size_x, wm_size_y)
+func (self *TouchHandler) mix_touch(touch_events chan *event_pack) {
 	id_2_vid := make([]int32, 10) //硬件ID到虚拟ID的映射
 	var last_id int32 = 0
 	pos_s := make([][]int32, 10)
@@ -1044,15 +1015,15 @@ func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max
 	translate_xy := func(x, y int32) (int32, int32) { //根据设备方向 将eventX的坐标系转换为标准坐标系
 		switch global_device_orientation { //
 		case 0: //normal
-			return int32(int64(x) * 0x7ffffffe / int64(wm_size_x)), int32(int64(y) * 0x7ffffffe / int64(wm_size_y))
+			return x, y
 		case 1: //left side down
 			// return y, self.screen_y - x
-			return int32(int64(y) * 0x7ffffffe / int64(wm_size_y)), int32(int64(wm_size_x-x) * 0x7ffffffe / int64(wm_size_x))
+			return y, 0x7ffffffe - x
 		case 2: //up side down
 			// return self.screen_y - x, self.screen_x - y
-			return int32(int64(wm_size_x-x) * 0x7ffffffe / int64(wm_size_x)), int32(int64(wm_size_y-y) * 0x7ffffffe / int64(wm_size_y))
+			return 0x7ffffffe - x, 0x7ffffffe - y
 		case 3: //right side down
-			return int32(int64(wm_size_y-y) * 0x7ffffffe / int64(wm_size_y)), int32(int64(x) * 0x7ffffffe / int64(wm_size_x))
+			return 0x7ffffffe - y, x
 		default:
 			return x, y
 		}
@@ -1070,9 +1041,9 @@ func (self *TouchHandler) mix_touch(touch_events chan *event_pack, max_mt_x, max
 			for _, event := range event_pack.events {
 				switch event.Code {
 				case ABS_MT_POSITION_X:
-					pos_s[last_id] = []int32{event.Value * wm_size_x / max_mt_x, pos_s[last_id][1]}
+					pos_s[last_id] = []int32{event.Value, pos_s[last_id][1]}
 				case ABS_MT_POSITION_Y:
-					pos_s[last_id] = []int32{pos_s[last_id][0], event.Value * wm_size_y / max_mt_y}
+					pos_s[last_id] = []int32{pos_s[last_id][0], event.Value}
 				case ABS_MT_TRACKING_ID:
 					if event.Value == -1 {
 						id_statuses[last_id] = false

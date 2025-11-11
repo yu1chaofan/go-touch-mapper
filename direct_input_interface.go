@@ -25,7 +25,7 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 	MTPositionY := d.AbsoluteTypes()[evdev.AbsoluteMTPositionY]
 	direct_screen_x := int64(MTPositionX.Max)
 	direct_screen_y := int64(MTPositionY.Max)
-	logger.Warnf("数据将直接写入设备真实触屏 (%d, %d)", MTPositionX, MTPositionY)
+	logger.Warnf("数据将直接写入设备真实触屏 /dev/input/event%d (%d, %d)", index, direct_screen_x, direct_screen_y)
 	translateDirectXY := func(x, y int32) (int32, int32) {
 		switch global_device_orientation {
 		case 0:
@@ -39,7 +39,6 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 		default:
 			return int32(int64(x) * direct_screen_x / 0x7ffffffe), int32(int64(y) * direct_screen_y / 0x7ffffffe)
 		}
-		return int32(int64(x) * direct_screen_x / 0x7ffffffe), int32(int64(y) * direct_screen_y / 0x7ffffffe)
 	}
 	var count int32 = 0    //BTN_TOUCH 申请时为1 则按下 释放时为0 则松开
 	var last_id int32 = -1 //ABS_MT_SLOT last_id每次动作后修改 如果不等则额外发送MT_SLOT事件
@@ -97,8 +96,7 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 	move.Events[1] = evdev.Event{Type: EV_ABS, Code: ABS_MT_POSITION_Y, Value: 0}
 
 	return func(control_data touch_control_pack) {
-		// write_events := make([]*evdev.Event, 0)
-		// start := time.Now()
+		// logger.Tracef("direct touch handeler recv control data:%v", control_data)
 		if control_data.id == -1 { //在任何正常情况下 这里是拿不到ID=-1的控制包的因此可以直接丢弃
 			return
 		}
@@ -111,15 +109,12 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 				require_init.Events[3].Value = x
 				require_init.Events[4].Value = y
 				unix.Write(unixFd, require_init.data)
-				// packChan <- pack{data: require_init.data, ts: start}
 			} else {
 				require.Events[0].Value = control_data.id
 				require.Events[1].Value = control_data.id
 				require.Events[2].Value = x
 				require.Events[3].Value = y
 				unix.Write(unixFd, require.data)
-				// packChan <- pack{data: require.data, ts: start}
-
 			}
 
 		} else if control_data.action == TouchActionRelease {
@@ -128,19 +123,15 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 				if count -= 1; count == 0 {
 					switch_release_btnup.Events[0].Value = control_data.id
 					unix.Write(unixFd, switch_release_btnup.data)
-					// packChan <- pack{data: switch_release_btnup.data, ts: start}
 				} else {
 					switch_release.Events[0].Value = control_data.id
 					unix.Write(unixFd, switch_release.data)
-					// packChan <- pack{data: switch_release.data, ts: start}
 				}
 			} else {
 				if count -= 1; count == 0 {
 					unix.Write(unixFd, release_btnup.data)
-					// packChan <- pack{data: release_btnup.data, ts: start}
 				} else {
 					unix.Write(unixFd, release.data)
-					// packChan <- pack{data: release.data, ts: start}
 				}
 			}
 		} else if control_data.action == TouchActionMove {
@@ -151,15 +142,12 @@ func handel_touch_using_direct_touch(index int) touch_control_func {
 				switch_move.Events[1].Value = x
 				switch_move.Events[2].Value = y
 				unix.Write(unixFd, switch_move.data)
-				// packChan <- pack{data: switch_move.data, ts: start}
 
 			} else {
 				move.Events[0].Value = x
 				move.Events[1].Value = y
 				unix.Write(unixFd, move.data)
-				// packChan <- pack{data: move.data, ts: start}
 			}
 		}
-		// logger.Debugf("uinput handeler%v", time.Since(start))
 	}
 }
