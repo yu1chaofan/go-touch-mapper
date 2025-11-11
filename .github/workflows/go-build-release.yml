@@ -35,11 +35,15 @@ jobs:
     - name: install and pre build
       run: go build
 
+    - name: Get version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      
     - name: Build amd64
-      run: CGO_ENABLE=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.go_build_version=$(git describe --tags --abbrev=0)" -o go-touch-mapper_amd64
+      run: CGO_ENABLE=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.go_build_version=${{ steps.get_version.outputs.VERSION }}" -o go-touch-mapper_amd64
     
     - name: Build arm64
-      run: CGO_ENABLE=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.go_build_version=$(git describe --tags --abbrev=0)" -o go-touch-mapper_arm64
+      run: CGO_ENABLE=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.go_build_version=${{ steps.get_version.outputs.VERSION }}" -o go-touch-mapper_arm64
     
     - name: list files
       run: ls -al
