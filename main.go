@@ -678,8 +678,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Warn(*control_mode)
-
 	if go_build_version == "" {
 		go_build_version = "DEV"
 	}
@@ -1005,5 +1003,4 @@ func main() {
 		logger.Info("已停止")
 		time.Sleep(time.Millisecond * 40)
 	}
-
 }
